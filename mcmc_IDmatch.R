@@ -192,11 +192,9 @@ loglik[obs.dB.current==0]<- part1[obs.dB.current==0]
 loglik[obs.dB.current!=0]<- part2[obs.dB.current!=0]
 loglik.cand <- sum(loglik)
 
-
-
-
-
 if(runif(1)<exp(loglik.cand-loglik.curr)){
+##
+## Not the right stuff to update ... need to fix this
  loglik.mat<- loglik
  beta<- beta.c
  loglik.curr<- loglik.cand
