@@ -90,6 +90,7 @@ part1<-pnorm( cutpoint, mu, sigma.s,log=TRUE)
 loglik<- matrix(0,nrow=nrow(obs.dB),ncol=ntraps)
 loglik[obs.dB==0]<- part1[obs.dB==0]   # This is all Eq. 2 from Dawson and Efford 2009
 loglik[obs.dB!=0]<- part2[obs.dB!=0]
+loglik.mat<- loglik
 loglik.curr<- sum(loglik[z==1,])
 
 alpha.c<- rnorm(1,alpha, .3)
@@ -176,6 +177,25 @@ loglik.current<- sum(loglik)
 ## Now I  need to compute the loglike for the 2 clusters being affected, AFTER the swap
 
 
+### NOT DONE
+
+guys.in.current.after <- ID.cand == ID[s]         
+guys.in.candidate.after <- ID.cand == ID.cand[s]  
+
+guys.index<- z == 1 & (guys.in.current.after | guys.in.candidate.after)    # these are all the guys in the from and to clusters right now
+obs.dB.current<- obs.dB[guys.index,]  # all the data for samples assigned to cluster ID[s]
+mu.current<- alpha+ beta*D[guys.index, ]
+part2 <- dnorm(obs.dB.current,  mu.current , sigma.s,log=TRUE)
+part1<-pnorm( cutpoint, mu.current, sigma.s,log=TRUE)
+loglik<- matrix(0,nrow=sum(guys.index),ncol=ntraps)
+loglik[obs.dB.current==0]<- part1[obs.dB.current==0]
+loglik[obs.dB.current!=0]<- part2[obs.dB.current!=0]
+loglik.cand <- sum(loglik)
+
+
+
+
+
 if(runif(1)<exp(loglik.cand-loglik.curr)){
  loglik.mat<- loglik
  beta<- beta.c
@@ -211,7 +231,6 @@ inbox<- S.cand[,1]< xlim[2] & S.cand[,1]> xlim[1] & S.cand[,2] < ylim[2] & S.can
 S.cand[!inbox,]<- S[!inbox,]   
 D.cand<- e2dist(S.cand[ID,], traps)
 mu.c<- alpha+ beta*D.cand
-
 part2 <- dnorm(obs.dB,  mu.c , sigma.s,log=TRUE)
 part1 <- pnorm( cutpoint, mu.c, sigma.s,log=TRUE)
 loglik<- matrix(0,nrow=nrow(obs.dB),ncol=ntraps)
@@ -219,7 +238,6 @@ loglik[obs.dB==0]<- part1[obs.dB==0]
 loglik[obs.dB!=0]<- part2[obs.dB!=0]
 #loglik.cand<- rowSums(loglik)
 #loglik.cand<- rowSums(loglik)
-
 if( sum(dim(loglik)-dim(loglik.mat))!=0) browser()
 loglik.diff<- loglik - loglik.mat
 loglik.diff<- rowSums(loglik.diff)
