@@ -5,7 +5,7 @@
 #
 
 
-mcmc.fn<- function(traps, obs.dB, xlim, ylim,nsim,nburn,cluster=FALSE){
+mcmc.fn<- function(traps, obs.dB, xlim, ylim,nsim,nburn,cluster=FALSE, diag.plot=FALSE){
 
 # cluster = FALSE just estimates the number of sounds that were made
 # if cluster=TRUE then we will try to group the sounds into unique locations
@@ -51,7 +51,7 @@ for(i in 1:nind){    # nind should be nsamp
 loc.tmp<- apply(matrix(traps[obs.dB[i,]!=0,],ncol=2,byrow=FALSE),2,mean)
 print(loc.tmp)
 dvec<-   sqrt(  (loc.tmp[1] - u[,1] )^2 + (loc.tmp[2] - u[,2])^2)
-ID[i]<-  (1:M)[dvec==min(dvec)][1]
+ID[i]<-  (1:Nclust)[dvec==min(dvec)][1]
 }
 for(i in (nind+1):M){
 ID[i]<- sample(1:Nclust, 1 )
@@ -195,46 +195,90 @@ J.from<- J.from/sum(J.from)
 J.from<-J.from[ID[s]]
 adjust<- J.from/J.to
 
-
+if(ID.cand[s]==ID[s]) next
  
 guys.in.current.ID <- ID == ID[s]   # Note this includes "s" obviously
 guys.in.candidate.ID <- ID == ID.cand[s]   # This is the current state of the candidate cluster, does not include "s"
 guys.index<- z == 1 & (guys.in.current.ID | guys.in.candidate.ID)    # these are all the guys in the from and to clusters right now
-
 obs.dB.current<- obs.dB[guys.index,]  # all the data for samples assigned to cluster ID[s]
-mu.current<-  (alpha+ beta*D[ID,])[guys.index, ]
+
+obs.dB.current<- obs.dB[s,]
+mu.current<-  (alpha+ beta*D[ID[s],])  #####[guys.index, ]
 part2 <- dnorm(obs.dB.current,  mu.current , sigma.s,log=TRUE)
 part1<-pnorm( cutpoint, mu.current, sigma.s,log=TRUE)
-loglik<- matrix(0,nrow=sum(guys.index),ncol=ntraps)
-loglik[obs.dB.current==0]<- part1[obs.dB.current==0]
-loglik[obs.dB.current!=0]<- part2[obs.dB.current!=0]
+loglik<- matrix(0,nrow=1,ncol=ntraps)
+ll.part1<-  ( part1[obs.dB.current==0] )
+loglik[obs.dB.current==0]<-  ll.part1
+ll.part2<-  ( part2[obs.dB.current!=0] )
+loglik[obs.dB.current!=0]<- ll.part2
+loglik<-rowSums(loglik)
 loglik.current<- sum(loglik)
+
+if(diag.plot){
+n.current <- c( sum(ID==ID[s]) , sum(ID==ID.cand[s]) )
+cat("----------------------------------------------------------",fill=TRUE)
+cat("ID[s]: ", ID[s], fill=TRUE)
+cat("n.current: ", n.current, fill=TRUE)
+cat("loglik: ", loglik.current,fill=TRUE)
+plot(gr,xlim=xlim,ylim=ylim)
+text(S[c(ID[s],ID.cand[s]),],as.character(c(ID[s],ID.cand[s]))) 
+
+for(xi in 1:n.current[1]){
+  xx<- matrix(obs.dB[ID==ID[s],],ncol=ntraps,byrow=FALSE)[xi,]
+  c.locs<- gr[xx<0,]
+  points(c.locs,pch=20,col=c("black","blue","green","cyan","red","orange")[xi])
+  text(gr[obs.dB[s,] <0,],"X")  # locations of sample being considered for swapping
+ for(pt in 1:nrow(c.locs)){
+ lines(  rbind(c.locs[pt,],
+  S[ID[s],]) )
+ }
+
+} 
+ }
 
 
 
 ## compute the loglike for the 2 clusters being affected, AFTER the swap
 guys.in.current.after <- ID.cand == ID[s]         
 guys.in.candidate.after <- ID.cand == ID.cand[s]  
-guys.index<- z == 1 & (guys.in.current.after | guys.in.candidate.after)    # these are all the guys in the from and to clusters right now
+guys.index2<- z == 1 & (guys.in.current.after | guys.in.candidate.after)    # these are all the guys in the from and to clusters right now
+obs.dB.current2<- obs.dB[guys.index2,]  # all the data for samples assigned to cluster ID[s]
 
-obs.dB.current<- obs.dB[guys.index,]  # all the data for samples assigned to cluster ID[s]
-mu.current<- (alpha+ beta*D[ID.cand,])[guys.index, ]
-part2 <- dnorm(obs.dB.current,  mu.current , sigma.s,log=TRUE)
-part1<-pnorm( cutpoint, mu.current, sigma.s,log=TRUE)
-loglik<- matrix(0,nrow=sum(guys.index),ncol=ntraps)
-loglik[obs.dB.current==0]<- part1[obs.dB.current==0]
-loglik[obs.dB.current!=0]<- part2[obs.dB.current!=0]
-loglik.cand <- sum(loglik)
+obs.dB.current2<- obs.dB[s,]
+mu.current2<- (alpha+ beta*D[ID.cand[s],])  #####[guys.index2, ]
+part22 <- dnorm(obs.dB.current2,  mu.current2 , sigma.s,log=TRUE)
+part12<-pnorm( cutpoint, mu.current2, sigma.s,log=TRUE)
+loglik2<- matrix(0,nrow=1,ncol=ntraps)
+ll.part12<-  (part12[obs.dB.current2==0] )
+loglik2[obs.dB.current2==0]<-  ll.part12
+ll.part22<-  ( part22[obs.dB.current2!=0] )
+loglik2[obs.dB.current2!=0]<-   ll.part22
+loglik2<- rowSums(loglik2)
+loglik.cand <- sum(loglik2)
 
 # not used
-n.current <- c( sum(ID==ID[s]) , sum(ID==ID.cand[s]) )
+if(diag.plot){
+
 n.prop<-     n.current + c( -1, +1) 
+cat("ID.cand[s]: ",ID.cand[s], fill=TRUE)
+cat("n.prop: ", n.prop, fill=TRUE)
+cat("loglik: ",loglik.cand,fill=TRUE)
+}
 
 
-if(runif(1)<exp(loglik.cand-loglik.curr)*adjust ){
-##
-## Not the right stuff to update ... need to fix this
- ID[s]<- ID.cand[s]
+if(ID[s] == ID.cand[s]){
+ if( loglik.cand != loglik.current) browser()
+}
+
+#prior.curr<- dpois(n.current, lambda=g0, log=TRUE)
+#prior.cand<- dpois(n.prop, lambda=g0, log=TRUE)
+prior.curr<- 0 
+prior.cand<- 0
+if(runif(1)<exp( (loglik.cand + prior.cand)-(loglik.current+prior.curr) )*adjust ){
+  ## Not the right stuff to update ... need to fix this
+ 
+  ID[s]<- ID.cand[s]
+
 }
   
 

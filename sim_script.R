@@ -51,6 +51,7 @@ N.signals<- length(source.ID)
 
 # Now simulate some acoustic sampling data
 
+ID.true<- as.numeric(factor(source.ID))
 
 # dist from location of each signal to recorders
 D<- e2dist(locs, gr)
@@ -86,6 +87,8 @@ obs.dB<-obs.dB[n.obs>0,]
  
 traps<- gr
 # Run my mcmc function
+
+ 
 out<- mcmc.fn(traps,obs.dB,xlim,ylim,900,100,cluster= TRUE)
 simout[iter,]<- c(apply(out$parms,2,mean),N.signals)
 
@@ -116,9 +119,10 @@ points(stmp,pch=20,col="red")
 points(gr[obs.dB[1,]<0,],pch=20)
 
 
+M<- ncol(id)
 c1<- NULL
-for(i in 1:1000){
- c1<-c(c1, (1:396)[id[i,]==1])
+for(i in 1:niter){
+ c1<-c(c1, (1:M)[id[i,]==1])
  
 }
 
