@@ -1,7 +1,7 @@
 library(scrbook)
-simout<- matrix(NA,nrow=10,ncol=6)
+simout<- matrix(NA,nrow=20,ncol=6)
 
-for(iter in 1:10){
+for(iter in 1:20){
 # trap locations (acoustic detectors)
 gr<- expand.grid(2:11,2:11)
 
@@ -86,12 +86,23 @@ obs.dB<-obs.dB[n.obs>0,]
  
 traps<- gr
 # Run my mcmc function
-out<- mcmc.fn(traps,obs.dB,xlim,ylim,1600,600)
+out<- mcmc.fn(traps,obs.dB,xlim,ylim,600,200,cluster=TRUE)
 simout[iter,]<- c(apply(out,2,mean),N.signals)
 
 
 
 }
+
+
+s<- out$Sout
+id<- out$ID
+stmp<- matrix(NA,nrow=400,ncol=2)
+for(i in 1:400){
+ stmp[i,1:2]<-  s[i,id[i,1],1:2]
+}
+
+
+
 
 
 
