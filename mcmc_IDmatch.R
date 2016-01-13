@@ -80,6 +80,7 @@ out<- matrix(NA,nrow=nsim,ncol=5)
 colnames(out)<-c("alpha","beta","sigma.s","psi","N")
 IDout<- matrix(NA, nrow=nsim, ncol=M)
 Sout<- array(NA, dim=c(nsim,Nclust,2))
+zout<- matrix(NA,nrow=nsim,ncol=M)
 
 for(sim in 1:nsim){
 
@@ -170,8 +171,12 @@ loglik[obs.dB!=0]<- part2[obs.dB!=0]
 }
 
 if(cluster==TRUE  ){
-for(s in 1:nind){  # each sample needs to have it's cluster membership updated   SHOULD THIS BE OVER M ????
+# u = reordered AND stretched-out. S = Nclust x 2 ,  u = M x 2
+u<- S[ID,] 
+
+for(s in 1:M){  # each sample needs to have it's cluster membership updated   SHOULD THIS BE OVER M ????
    # NOTE: the zero samples need to be placed too!  
+if(z[s]==0) next
 
 ID.cand<- ID
     # u = location of cluster that sample s is currently in 
@@ -194,7 +199,6 @@ adjust<- J.from/J.to
  
 guys.in.current.ID <- ID == ID[s]   # Note this includes "s" obviously
 guys.in.candidate.ID <- ID == ID.cand[s]   # This is the current state of the candidate cluster, does not include "s"
-
 guys.index<- z == 1 & (guys.in.current.ID | guys.in.candidate.ID)    # these are all the guys in the from and to clusters right now
 
 obs.dB.current<- obs.dB[guys.index,]  # all the data for samples assigned to cluster ID[s]
@@ -206,15 +210,15 @@ loglik[obs.dB.current==0]<- part1[obs.dB.current==0]
 loglik[obs.dB.current!=0]<- part2[obs.dB.current!=0]
 loglik.current<- sum(loglik)
 
-## Now I  need to compute the loglike for the 2 clusters being affected, AFTER the swap
 
- 
+
+## compute the loglike for the 2 clusters being affected, AFTER the swap
 guys.in.current.after <- ID.cand == ID[s]         
 guys.in.candidate.after <- ID.cand == ID.cand[s]  
-
 guys.index<- z == 1 & (guys.in.current.after | guys.in.candidate.after)    # these are all the guys in the from and to clusters right now
+
 obs.dB.current<- obs.dB[guys.index,]  # all the data for samples assigned to cluster ID[s]
-mu.current<- (alpha+ beta*D[ID,])[guys.index, ]
+mu.current<- (alpha+ beta*D[ID.cand,])[guys.index, ]
 part2 <- dnorm(obs.dB.current,  mu.current , sigma.s,log=TRUE)
 part1<-pnorm( cutpoint, mu.current, sigma.s,log=TRUE)
 loglik<- matrix(0,nrow=sum(guys.index),ncol=ntraps)
@@ -222,8 +226,11 @@ loglik[obs.dB.current==0]<- part1[obs.dB.current==0]
 loglik[obs.dB.current!=0]<- part2[obs.dB.current!=0]
 loglik.cand <- sum(loglik)
 
+# not used
 n.current <- c( sum(ID==ID[s]) , sum(ID==ID.cand[s]) )
 n.prop<-     n.current + c( -1, +1) 
+
+
 if(runif(1)<exp(loglik.cand-loglik.curr)*adjust ){
 ##
 ## Not the right stuff to update ... need to fix this
@@ -266,13 +273,13 @@ D.cand<- e2dist(S.cand, traps)
 mu.c<- alpha+ beta*D.cand[ID,]
 part2 <- dnorm(obs.dB,  mu.c , sigma.s,log=TRUE)
 part1 <- pnorm( cutpoint, mu.c, sigma.s,log=TRUE)
-loglik<- matrix(0,nrow=nrow(obs.dB),ncol=ntraps)
-loglik[obs.dB==0]<- part1[obs.dB==0]
-loglik[obs.dB!=0]<- part2[obs.dB!=0]
+loglik.cand<- matrix(0,nrow=nrow(obs.dB),ncol=ntraps)
+loglik.cand[obs.dB==0]<- part1[obs.dB==0]
+loglik.cand[obs.dB!=0]<- part2[obs.dB!=0]
 #loglik.cand<- rowSums(loglik)
 #loglik.cand<- rowSums(loglik)
-if( sum(dim(loglik)-dim(loglik.mat))!=0) browser()
-loglik.diff<- loglik - loglik.mat
+if( sum(dim(loglik.cand)-dim(loglik.mat))!=0) browser()
+loglik.diff<- loglik.cand - loglik.mat
 loglik.diff<- rowSums(loglik.diff)
 loglik.diff[z==0]<- 0     # I think this is right, sets rat = 1 so always accept?
 
@@ -280,20 +287,27 @@ loglik.diff[z==0]<- 0     # I think this is right, sets rat = 1 so always accept
 #rat<- exp(loglik.cand[,2]- aggregate( rowSums(loglik.mat), list(ID), sum)[,2] )
 
 loglik.diff<- aggregate(loglik.diff, list(ID), sum) 
-rat<- exp( loglik.diff[,2] )
-idx<- rep(1,Nclust)
-idx[loglik.diff[,1]]<- rat
-rat<-idx
+loglik.diff2<- rep(0,Nclust)
+loglik.diff2[loglik.diff[,1]]<- loglik.diff[,2]
+ 
+rat<- exp( loglik.diff2 )
+ 
+ 
 #rat[z==0]<- 1    # not sure about this. if cluster = false then this z=0 condition has to be set
                   # in general z=0 need to be removed from the aggregate above.. SEE ABOVE
 swap<- runif(Nclust)< rat 
 S[swap,]<- S.cand[swap,] 
-#######
-# These are of differing dimensions which needs resolved if cluster=TRUE (swap = Nclust x 1)
-########
-loglik.mat[swap,]<- loglik[swap,]
 D[swap,]<- D.cand[swap,]
-mu<- mu.c[swap,]
+
+# Recompute likelihood matrix
+mu<- alpha+ beta*D[ID,]
+part2 <- dnorm(obs.dB,  mu , sigma.s,log=TRUE)
+part1<-pnorm( cutpoint, mu, sigma.s,log=TRUE)
+loglik<- matrix(0,nrow=nrow(obs.dB),ncol=ntraps)
+loglik[obs.dB==0]<- part1[obs.dB==0]   # This is all Eq. 2 from Dawson and Efford 2009
+loglik[obs.dB!=0]<- part2[obs.dB!=0]
+loglik.mat<- loglik
+
  
 
 # does not need to change? This is vocalization level pr(detection)
@@ -306,11 +320,12 @@ psi<- rbeta(1, 1+ sum(z), 1+M-sum(z))
 IDout[sim,]<- ID
 Sout[sim,1:Nclust,1:2]<- S
 out[sim,]<- c(alpha, beta, sigma.s, psi, sum(z))
-
+zout[sim,]<- z
 }
 
 return( list( parms = out[(nburn+1):nsim,],  
-ID = IDout[(nburn+1):nsim,] , Sout=Sout[(nburn+1):nsim,,] ) )
+ID = IDout[(nburn+1):nsim,] , Sout=Sout[(nburn+1):nsim,,],
+ zout=zout[(nburn+1):nsim,]   ) )
 }
 
 

@@ -86,8 +86,8 @@ obs.dB<-obs.dB[n.obs>0,]
  
 traps<- gr
 # Run my mcmc function
-out<- mcmc.fn(traps,obs.dB,xlim,ylim,600,200,cluster=TRUE)
-simout[iter,]<- c(apply(out,2,mean),N.signals)
+out<- mcmc.fn(traps,obs.dB,xlim,ylim,900,100,cluster= TRUE)
+simout[iter,]<- c(apply(out$parms,2,mean),N.signals)
 
 
 
@@ -96,10 +96,34 @@ simout[iter,]<- c(apply(out,2,mean),N.signals)
 
 s<- out$Sout
 id<- out$ID
-stmp<- matrix(NA,nrow=400,ncol=2)
-for(i in 1:400){
+z<- out$zout
+
+niter<- nrow(z)
+
+nclust<- meanclust<- rep(NA, niter)
+for(i in 1:niter){
+ nclust[i]<- length(unique(id[i,][z[i,]==1]))
+ meanclust[i]<-  mean(table(id[i,][z[i,]==1]))
+}
+
+stmp<- matrix(NA,nrow=niter,ncol=2)
+for(i in 1:niter){
  stmp[i,1:2]<-  s[i,id[i,1],1:2]
 }
+plot(gr)
+points(gr[obs.dB[1,]<0,],pch=20)
+points(stmp,pch=20,col="red")
+points(gr[obs.dB[1,]<0,],pch=20)
+
+
+c1<- NULL
+for(i in 1:1000){
+ c1<-c(c1, (1:396)[id[i,]==1])
+ 
+}
+
+
+
 
 
 
