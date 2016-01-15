@@ -1,7 +1,7 @@
 library(scrbook)
-simout<- matrix(NA,nrow=20,ncol=6)
+simout<- matrix(NA,nrow=100,ncol=11)
 
-for(iter in 1:20){
+for(iter in 1:100){
 # trap locations (acoustic detectors)
 gr<- expand.grid(2:11,2:11)
 
@@ -32,19 +32,30 @@ N.sources<- sum(ncall.locs)
 #   As noted above, a parametric model might be important/necessary here.
 locs.x<- NULL
 locs.y<- NULL
-ind.ID<- source.ID<- NULL
+ind.ID<- source.ID<- nbr.tweets<- NULL
 for(i in 1:N){
   if(ncall.locs[i]==0) next   # this guy not detected at all
+
   ncalls.x<- rnorm(ncall.locs[i], Sx[i], sigma.move)
   ncalls.y<- rnorm(ncall.locs[i], Sy[i], sigma.move)
     # next line is the number of calls from each location
-  nbr.calls<- sample(1:4, ncall.locs[i], replace=TRUE,prob=c(.25, .5, .2, .05) )
+  nbr.calls<- rpois(ncall.locs[i], 1.1) ###sample(1:4, ncall.locs[i], replace=TRUE,prob=c(.25, .5, .2, .05) )
+  nbr.tweets<- c(nbr.tweets, nbr.calls)
   locs.x<- c(locs.x,   rep(ncalls.x, nbr.calls) )  # nbr.calls at each location
   locs.y<- c(locs.y,   rep(ncalls.y, nbr.calls) ) 
   ind.ID<- c(ind.ID, rep(i, sum(nbr.calls) ) )
   source.ID<- c(source.ID,rep(paste(i,1:ncall.locs[i],sep="."), nbr.calls))
 }
+
+# Each call location that had NO TWEETS is identified
+no.call<- nbr.tweets==0
+
+# Those do not count as sources.
+N.sources0<- length(no.call)
+N.sources<- sum(!no.call)  # number of calling locations with > 0 calls
+
 locs<- cbind(locs.x, locs.y)
+source.ID<- source.ID
 
 # This is the total number of acoustic signals made ("tweets")
 N.signals<- length(source.ID)
@@ -89,13 +100,49 @@ traps<- gr
 # Run my mcmc function
 
  
-out<- mcmc.fn(traps,obs.dB,xlim,ylim,900,100,cluster= TRUE)
-simout[iter,]<- c(apply(out$parms,2,mean),N.signals)
+out1<- mcmc.fn(traps,obs.dB,xlim,ylim,2500,500,cluster= TRUE,clust.prior=TRUE)
+
+o<- out1
+s<- o$Sout
+id<- o$ID
+z<- o$zout
+
+niter<- nrow(z)
+
+nclust<- meanclust<- rep(NA, niter)
+for(i in 1:niter){
+ nclust[i]<- length(unique(id[i,][z[i,]==1]))
+ meanclust[i]<-  mean(table(id[i,][z[i,]==1]))
+}
+c(mean(nclust), mean(meanclust))
+
+out2<- mcmc.fn(traps,obs.dB,xlim,ylim,2500,500,cluster= TRUE,clust.prior=FALSE)
+
+o<- out2
+s<- o$Sout
+id<- o$ID
+z<- o$zout
+
+niter<- nrow(z)
+
+nclust<- meanclust<- rep(NA, niter)
+for(i in 1:niter){
+ nclust[i]<- length(unique(id[i,][z[i,]==1]))
+ meanclust[i]<-  mean(table(id[i,][z[i,]==1]))
+}
+
+
+
+
+
+
+simout[iter,]<- c(apply(out$parms,2,mean),N.signals, mean(nclust), N.sources, mean(meanclust))
 
 
 
 }
-
+colnames(simout)<-c("alpha","beta","sigma.s","g0","psi.clust","psi","Ntweets","truevalue",
+"Nclust","trueclust","meanclust")
 
 s<- out$Sout
 id<- out$ID
